@@ -1,0 +1,40 @@
+{
+    "name": "dynamodb-data-migration-migrator",
+    "version": "0.0.1",
+    "description": "Tool for simplifying DynamoDB data migration with DynamoDB Streams",
+    "homepage": "https://github.com/jasonwadsworth/dynamodb-data-migration/migrator#readme",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/jasonwadsworth/dynamodb-data-migration"
+    },
+    "main": "index.js",
+    "types": "index.d.ts",
+    "scripts": {
+        "test": "jest",
+        "build": "./node_modules/.bin/tsc && cp package.json ./lib && cp README.md ./lib",
+        "package": "npm ci && npm run build && npm pack ./lib"
+    },
+    "keywords": [
+        "dyanmodb",
+        "migrate",
+        "serverless",
+        "aws"
+    ],
+    "author": "Jason Wadsworth",
+    "license": "MIT",
+    "devDependencies": {
+        "@types/aws-lambda": "^8.10.66",
+        "@types/aws-sdk": "^2.7.0",
+        "@types/jest": "^26.0.19",
+        "@types/node": "^14.14.14",
+        "aws-sdk": "^2.812.0",
+        "dynamodb-local-test-helper": "^1.0.4",
+        "jest": "^26.6.3",
+        "ts-jest": "^26.4.4",
+        "ts-mockito": "^2.6.1",
+        "typescript": "^4.1.3"
+    },
+    "engine": {
+        "node": "=12.0"
+    }
+}

@@ -1,0 +1,118 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Delayed Event Processing
+Resources:
+  SourceTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: source
+      AttributeDefinitions:
+        - AttributeName: PartitionKey
+          AttributeType: S
+        - AttributeName: SortKey
+          AttributeType: S
+      BillingMode: PAY_PER_REQUEST
+      StreamSpecification:
+        StreamViewType: 'NEW_AND_OLD_IMAGES'
+      KeySchema:
+        - AttributeName: PartitionKey
+          KeyType: HASH
+        - AttributeName: SortKey
+          KeyType: RANGE
+
+  DestinationTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: destination
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+        - AttributeName: sk
+          AttributeType: S
+        - AttributeName: gsi1_pk
+          AttributeType: S
+        - AttributeName: gsi1_sk
+          AttributeType: S
+      BillingMode: PAY_PER_REQUEST
+      StreamSpecification:
+        StreamViewType: 'NEW_AND_OLD_IMAGES'
+      GlobalSecondaryIndexes:
+        - IndexName: gsi1
+          KeySchema:
+            - AttributeName: gsi1_pk
+              KeyType: HASH
+            - AttributeName: gsi1_sk
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+        - AttributeName: sk
+          KeyType: RANGE
+
+  LogGroup:
+    Type: 'AWS::Logs::LogGroup'
+    Properties:
+      LogGroupName: /aws/lambda/migrator
+      RetentionInDays: 3
+
+  Function:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      FunctionName: migrator
+      Handler: handler.handler
+      Runtime: nodejs12.x
+      MemorySize: 128
+      Timeout: 300
+      Role: !GetAtt Role.Arn
+
+  DynamoStreamTrigger:
+    Type: 'AWS::Lambda::EventSourceMapping'
+    Properties:
+      Enabled: true
+      EventSourceArn: !GetAtt SourceTable.StreamArn
+      FunctionName: !Ref Function
+      StartingPosition: LATEST
+
+  Policy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource:
+              - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/migrator
+              - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/migrator:*
+          - Action:
+              - dynamodb:BatchWriteItem
+            Effect: Allow
+            Resource:
+              - !GetAtt DestinationTable.Arn
+          - Action:
+              - 'dynamodb:ListStreams'
+            Effect: Allow
+            Resource: '*'
+          - Effect: Allow
+            Action:
+              - 'dynamodb:DescribeStream'
+              - 'dynamodb:Get*'
+            Resource:
+              - !GetAtt SourceTable.StreamArn
+
+  Role:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - !Ref Policy
