@@ -62,8 +62,8 @@ Resources:
       FunctionName: migrator
       Handler: handler.handler
       Runtime: nodejs12.x
-      MemorySize: 128
-      Timeout: 300
+      MemorySize: 512
+      Timeout: 60
       Role: !GetAtt Role.Arn
 
   DynamoStreamTrigger:

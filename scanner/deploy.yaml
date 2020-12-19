@@ -1,0 +1,119 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Delayed Event Processing
+Parameters:
+  SourceTableName:
+    Type: String
+Resources:
+  LogGroup:
+    Type: 'AWS::Logs::LogGroup'
+    Properties:
+      LogGroupName: /aws/lambda/scanner
+      RetentionInDays: 3
+
+  Function:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      FunctionName: scanner
+      Handler: handler.handler
+      Runtime: nodejs12.x
+      MemorySize: 512
+      Timeout: 900
+      Role: !GetAtt FunctionRole.Arn
+
+  FunctionPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource:
+              - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/scanner
+              - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/scanner:*
+          - Action:
+              - dynamodb:UpdateItem
+              - dynamodb:Scan
+            Effect: Allow
+            Resource:
+              - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${SourceTableName}
+
+  FunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - !Ref FunctionPolicy
+
+  StateMachine:
+    Type: AWS::StepFunctions::StateMachine
+    Properties:
+      RoleArn: !GetAtt StateMachineRole.Arn
+      DefinitionString: !Sub |-
+        {
+          "Comment": "Scans the table",
+          "StartAt": "Scan",
+          "States": {
+            "Scan": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::lambda:invoke",
+              "Parameters": {
+                "FunctionName": "${Function.Arn}",
+                "Payload": {
+                  "input.$": "$"
+                }
+              },
+              "Next": "HasMore"
+            },
+            "HasMore": {
+              "Type": "Choice",
+              "Choices": [
+                {
+                  "Variable": "$.Payload.LastEvaluatedKey",
+                  "IsPresent": true,
+                  "Next": "Scan"
+                }
+              ],
+              "Default": "Done"
+            },
+            "Done": {
+              "Type": "Pass",
+              "End": true
+            }
+          }
+        }
+
+  StateMachinePolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Action:
+              - lambda:InvokeFunction
+            Effect: Allow
+            Resource:
+              - !GetAtt Function.Arn
+
+  StateMachineRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: !Sub states.${AWS::Region}.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - !Ref StateMachinePolicy

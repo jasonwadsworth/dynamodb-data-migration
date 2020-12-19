@@ -1,7 +1,7 @@
 {
-    "name": "example",
-    "version": "1.0.0",
-    "description": "Example lambda for data migration",
+    "name": "scanner",
+    "version": "0.0.1",
+    "description": "",
     "main": "handler.js",
     "scripts": {
         "test": "echo \"Error: no test specified\" && exit 1",
@@ -16,8 +16,5 @@
         "@types/aws-sdk": "^2.7.0",
         "@types/node": "^14.14.14",
         "typescript": "^4.1.3"
-    },
-    "dependencies": {
-        "dynamodb-data-migration-migrator": "0.0.1"
     }
 }
