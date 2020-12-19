@@ -48,7 +48,24 @@ export class Migrator {
                     }
                 });
             }
-            else if (record?.eventName === 'REMOVE') {
+
+            if (record?.eventName === 'MODIFY') {
+                const convertedOldImage = this.imageConverter(record.dynamodb!.OldImage!);
+                const oldImageKeys = this.getNewKeys(convertedOldImage, this.newKeyFields ?? Object.keys(record.dynamodb!.Keys!));
+
+                if (!this.compareKeys(keys, oldImageKeys)) {
+                    writes.push({
+                        key: oldImageKeys, // TODO: there is a chance this key is already in the array
+                        writeRequest: {
+                            DeleteRequest: {
+                                Key: oldImageKeys
+                            }
+                        }
+                    });
+                }
+            }
+
+            if (record?.eventName === 'REMOVE') {
                 writes.push({
                     key: keys,
                     writeRequest: {
@@ -103,16 +120,16 @@ export class Migrator {
     private compareKeys(key1: { [key: string]: AttributeValue }, key2: { [key: string]: AttributeValue }): boolean {
         for (const key of Object.keys(key1)) {
             if (
-                (key1[key].N && key1[key].N === key2[key].N)
+                (key1[key].N && key1[key].N !== key2[key].N)
                 ||
-                (key1[key].S && key1[key].S === key2[key].S)
+                (key1[key].S && key1[key].S !== key2[key].S)
                 ||
-                (key1[key].B && key1[key].B === key2[key].B)
+                (key1[key].B && key1[key].B !== key2[key].B)
             ) {
-                return true;
+                return false;
             }
         }
 
-        return false;
+        return true;
     }
 }

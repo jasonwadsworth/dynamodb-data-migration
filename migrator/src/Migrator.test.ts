@@ -142,6 +142,17 @@ describe('Migrator', () => {
                             myValue1: {
                                 S: 'value1'
                             }
+                        },
+                        OldImage: {
+                            pk: {
+                                S: 'key1'
+                            },
+                            sk: {
+                                S: 'sort1'
+                            },
+                            myValue1: {
+                                S: 'oldvalue1'
+                            }
                         }
                     }
                 }
@@ -210,7 +221,7 @@ describe('Migrator', () => {
                 }
             },
             TableName: TABLE_NAME
-        })
+        }).promise();
 
         const event: DynamoDBStreamEvent = {
             Records: [
@@ -288,7 +299,7 @@ describe('Migrator', () => {
                 }
             },
             TableName: TABLE_NAME
-        })
+        }).promise();
 
         const event: DynamoDBStreamEvent = {
             Records: [
@@ -338,6 +349,17 @@ describe('Migrator', () => {
                             },
                             myValue1: {
                                 S: 'value2'
+                            }
+                        },
+                        OldImage: {
+                            pk: {
+                                S: 'key2'
+                            },
+                            sk: {
+                                S: 'sort2'
+                            },
+                            myValue1: {
+                                S: 'oldvalue2'
                             }
                         }
                     }
@@ -476,7 +498,7 @@ describe('Migrator', () => {
                 }
             },
             TableName: TABLE_NAME
-        })
+        }).promise();
 
         const event: DynamoDBStreamEvent = {
             Records: [
@@ -526,6 +548,17 @@ describe('Migrator', () => {
                             },
                             myValue1: {
                                 S: 'value2'
+                            }
+                        },
+                        OldImage: {
+                            pk: {
+                                S: 'key1'
+                            },
+                            sk: {
+                                S: 'sort1'
+                            },
+                            myValue1: {
+                                S: 'value1'
                             }
                         }
                     }
@@ -791,6 +824,17 @@ describe('Migrator', () => {
                             myValue1: {
                                 S: 'value1'
                             }
+                        },
+                        OldImage: {
+                            oldpk: {
+                                S: 'key1'
+                            },
+                            oldsk: {
+                                S: 'sort1'
+                            },
+                            myValue1: {
+                                S: 'oldvalue1'
+                            }
                         }
                     }
                 }
@@ -873,7 +917,7 @@ describe('Migrator', () => {
                 }
             },
             TableName: TABLE_NAME
-        })
+        }).promise();
 
         const event: DynamoDBStreamEvent = {
             Records: [
@@ -914,6 +958,114 @@ describe('Migrator', () => {
                 },
                 sk: {
                     S: 'sort1'
+                }
+            },
+            TableName: TABLE_NAME
+        }).promise();
+
+        expect(result.Item).toBeUndefined();
+    });
+
+    it('should handle a modify where the new key changes', async () => {
+        const migrator: Migrator = new Migrator(
+            dynamoDbClient,
+            TABLE_NAME,
+            (image) => {
+                return {
+                    ...image,
+                    sk: image.newSk,
+                };
+            },
+            undefined);
+
+        // insert the record into the database so we can delete
+        await dynamoDbClient.putItem({
+            Item: {
+                pk: {
+                    S: 'key1'
+                },
+                sk: {
+                    S: 'old'
+                },
+                myValue1: {
+                    S: 'value1'
+                }
+            },
+            TableName: TABLE_NAME
+        }).promise();
+
+        const event: DynamoDBStreamEvent = {
+            Records: [
+                {
+                    awsRegion: 'us-midwest-1',
+                    eventName: 'MODIFY',
+                    dynamodb: {
+                        Keys: {
+                            pk: {
+                                S: 'key1'
+                            },
+                            sk: {
+                                S: 'sort1'
+                            }
+                        },
+                        NewImage: {
+                            pk: {
+                                S: 'key1'
+                            },
+                            sk: {
+                                S: 'sort1'
+                            },
+                            myValue1: {
+                                S: 'value1'
+                            },
+                            newSk: {
+                                S: 'new'
+                            }
+                        },
+                        OldImage: {
+                            pk: {
+                                S: 'key1'
+                            },
+                            sk: {
+                                S: 'sort1'
+                            },
+                            myValue1: {
+                                S: 'value1'
+                            },
+                            newSk: {
+                                S: 'old'
+                            }
+                        }
+                    }
+                }
+            ]
+        };
+
+        await migrator.handleEvent(event);
+
+        // the new record should exist
+        let result = await dynamoDbClient.getItem({
+            Key: {
+                pk: {
+                    S: 'key1'
+                },
+                sk: {
+                    S: 'new'
+                }
+            },
+            TableName: TABLE_NAME
+        }).promise();
+
+        expect(result.Item).toBeDefined();
+
+        // the old record should be deleted
+        result = await dynamoDbClient.getItem({
+            Key: {
+                pk: {
+                    S: 'key1'
+                },
+                sk: {
+                    S: 'old'
                 }
             },
             TableName: TABLE_NAME
