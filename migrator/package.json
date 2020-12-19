@@ -1,6 +1,6 @@
 {
     "name": "dynamodb-data-migration-migrator",
-    "version": "0.0.2",
+    "version": "0.0.3",
     "description": "Tool for simplifying DynamoDB data migration with DynamoDB Streams",
     "homepage": "https://github.com/jasonwadsworth/dynamodb-data-migration#readme",
     "repository": {
